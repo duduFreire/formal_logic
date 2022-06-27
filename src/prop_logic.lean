@@ -1,7 +1,7 @@
 import tactic 
 import tactic.induction
 import order.zorn
-
+import tukey
 
 namespace prop_logic
 
@@ -216,7 +216,6 @@ begin
 	exact prop_thm.imp_e this h,
 end
 
-
 lemma completeness_iff : 
 (∀{Γ φ}, (Γ ⊨ φ) → (Γ ⊢ φ)) ↔ (∀{Γ}, consistent Γ → satisfiable Γ) :=
 begin
@@ -263,7 +262,7 @@ begin
 end
 
 lemma maximal_consistent_iff (Γ : set prop_formula) : maximal_consistent Γ ↔ (consistent Γ ∧ 
-∀Δ, consistent Δ → ¬ (Γ ⊂ Δ)) := 
+∀Δ, consistent Δ → ¬(Γ ⊂ Δ)) := 
 begin
 	split,
 	{
@@ -442,143 +441,39 @@ begin
 	},
 end
 
-lemma max_of_fin_chain {α : Type*} [partial_order α]
-: ∀{c : set α}, c.finite → is_chain (≤) c → c.nonempty → ∃m ∈ c, ∀{b}, b ∈ c → b ≤ m :=
-begin
-	intros c c_fin c_chain c_nonempty,
-	set P : set α → Prop := λx, (∃(x_fin : x.finite) (x_chain : is_chain (≤) x)
-	 (x_nonempty : x.nonempty), true) → ∃m ∈ x, ∀{b}, b ∈ x → b ≤ m with P_def,
-
-	have P_empty : P ∅,
+lemma finite_character_of_consistent : finite_character {Γ : (set prop_formula) | consistent Γ} :=
+begin 
+	intros Δ,
+	split,
 	{
-		rw P_def,
+		intros Δ_con Y Y_ss Y_fin,
+		by_contra h,
+		simp at *,unfold consistent at *, push_neg at h,
+		exact Δ_con (proves_of_subset_proves Y_ss h),
+	},
+	{
 		intro h,
-		rcases h with ⟨a, a, contra, -⟩, exfalso,
-		exact set.not_nonempty_empty contra,
-	},
-
-	suffices h : P c, {exact h ⟨c_fin, c_chain, c_nonempty, true.intro⟩},
-	apply set.finite.induction_on c_fin P_empty,
-	intros a s has s_fin hPs,
-	intro h,
-	rcases h with ⟨as_finite, as_chain, as_nonemtpty, -⟩,
-	have s_chain := is_chain.mono (set.subset_insert a s) as_chain,
-	by_cases s_nonempty : s.nonempty,
-	{
-		rcases hPs ⟨s_fin, s_chain, s_nonempty, true.intro⟩ with ⟨m, hms, hm⟩,
-		by_cases h : a ≤ m,
-		{
-			use [m, set.mem_insert_of_mem a hms],
-			intros b hb,
-			simp at hb,
-			cases hb, {rwa hb},
-			{exact hm hb},
-		},
-		{
-			have hmas : m ∈ (insert a s) := set.mem_insert_of_mem a hms,
-			have haas : a ∈ (insert a s) := set.mem_insert a s,
-			have hma : m ≤ a,
-			{
-				unfold is_chain at as_chain,
-				unfold set.pairwise at as_chain,
-				by_cases m_eq_a : m = a, {rw m_eq_a},
-				specialize as_chain hmas haas m_eq_a,
-				tauto,
-			},
-			use [a, haas],
-			intros b hb, simp at hb,
-			cases hb,
-			{rw hb},
-			{
-				specialize hm hb,
-				exact le_trans hm hma,
-			},
-		},
-	},
-	rw set.not_nonempty_iff_eq_empty at s_nonempty,
-	use [a, set.mem_insert a s], rw s_nonempty,
-	intros b hb, simp at hb, rw hb,
+		simp at *,
+		intro Δ_bot,
+		rcases fin_subset_proves_of_proves Δ_bot with ⟨Y, Y_ss, Y_fin, Y_bot⟩,
+		exact (h Y_ss Y_fin) Y_bot,
+	}
 end
 
 lemma maximal_consistent_of_consistent {Γ} :
 consistent Γ → ∃Γ', Γ ⊆ Γ' ∧ maximal_consistent Γ' :=
-begin
+begin 
 	intro Γ_con,
-	have := zorn_subset_nonempty {Γ : set prop_formula | consistent Γ} _, swap,
-	{
-		intros c c_ss c_chain gbg,
-		use [c.sUnion],
-		simp,
-		split, swap, {exact λs hs, set.subset_sUnion_of_mem hs},
-		by_contra c_bot,
-		unfold consistent at c_bot, push_neg at c_bot,
-		rcases fin_subset_proves_of_proves c_bot with ⟨Δ, Δ_ss, Δ_fin, Δ_bot⟩,
-		suffices : ∃b ∈ c, b ⊢ ⊥,
-		{
-			rcases this with ⟨b, hb1, hb2⟩,
-			have := c_ss hb1, simp at this,
-			exact Γ_con (false.rec (Γ ⊢ ⊥) (this hb2)),
-		},
-
-		have : ∀p ∈ Δ, ∃ζ ∈ c, p ∈ ζ,
-		{
-			intros p hp,
-			rcases Δ_ss hp with ⟨ζ, hζc, hpζ⟩,
-			exact ⟨ζ, hζc, hpζ⟩,
-		}, 
-		choose f hfc hf using this,
-		have sub_chain_fin := set.finite.dependent_image Δ_fin f,
-		set sub_chain := {y : set prop_formula | ∃ (x : prop_formula) (hx : x ∈ Δ), y = f x hx}
-		with sub_chain_def,
-		have sub_chain_ss : sub_chain ⊆ c,
-		{
-			intros ζ hζ,
-			rw sub_chain_def at hζ,
-			simp at hζ,
-			rcases hζ with ⟨p, hpΔ, hpf⟩,
-			rw hpf,
-			exact hfc p hpΔ,
-		},
-		have Δ_nonempty : (Δ.nonempty),
-		{
-			by_contra h,
-			rw set.not_nonempty_iff_eq_empty at h,
-			rw h at Δ_bot,
-			exact empty_consistent Δ_bot,
-		},
-		have sub_chain_nonempty : sub_chain.nonempty,
-		{
-			cases Δ_nonempty with p hp,
-			have : f p hp ∈ sub_chain,
-			{
-				rw sub_chain_def, simp,
-				exact ⟨p, hp, rfl⟩,
-			},
-			exact set.nonempty_of_mem this,
-		},
-		rcases max_of_fin_chain sub_chain_fin (is_chain.mono sub_chain_ss c_chain) 
-		sub_chain_nonempty with ⟨m, hmsub, hm⟩,
-		use [m, sub_chain_ss hmsub],
-		suffices : Δ ⊆ m, {exact proves_of_subset_proves this Δ_bot,},
-		suffices : ∀p ∈ Δ, ∃b ∈ sub_chain, p ∈ b,
-		{
-			intros p hp,
-			rcases this p hp with ⟨b, b_sub, hpb⟩,
-			exact @hm b b_sub p hpb,
-		},
-		intros p hp,
-		use [f p hp], rw sub_chain_def, simp,
-		use [p, hp, rfl, hf p hp],
-	},
-
-	rcases (this Γ Γ_con) with ⟨Γ', Γ'_con, Γ'_contains, Γ'_maximal⟩,
+	have : Γ ∈ {Γ : (set prop_formula) | consistent Γ} := Γ_con,
+	rcases exists_maximal_of_finite_character this finite_character_of_consistent with
+	 ⟨Γ', Γ'_con, Γ_ss, Γ'_maximal⟩,
 	simp at Γ'_con,
-	use [Γ', Γ'_contains],
+	use [Γ', Γ_ss],
 	rw maximal_consistent_iff, use Γ'_con,
 	intros Δ Δ_con, 
 	rw ssubset_iff_subset_ne,
 	push_neg,
-	finish [Γ'_maximal Δ Δ_con],
+	finish [Γ'_maximal Δ_con],
 end
 
 theorem completeness (Γ φ) : (Γ ⊢ φ) ↔ (Γ ⊨ φ) :=
@@ -599,6 +494,96 @@ begin
 	rw completeness,
 	intros s hs,
 	unfold value,
+	tauto!,
+end
+
+namespace prop_formula
+
+def or (φ ψ) := (¬φ ->> ψ)
+def and (φ ψ) := (or (¬φ) (¬ψ)) ->> ⊥
+def iff (φ ψ) := and (φ ->> ψ) (ψ ->> φ)
+
+infix ` ∨ ` := or
+infix ` ∧ ` := and
+infix ` ↔ ` := iff
+
+end prop_formula
+
+-- Proof of or introduction without completeness for comparison with
+-- lemma or_inl, which uses completeness.
+example {Γ φ} (ψ : prop_formula) : Γ ⊢ φ → Γ ⊢ (φ ∨ ψ) :=
+begin
+	intro h,
+	apply prop_thm.imp_i,
+	apply prop_thm.bot_e,
+	exact prop_thm.imp_e (prop_thm.ax (by simp at *)) 
+	(proves_of_subset_proves (set.subset_union_left Γ {φ ->> ⊥}) h),
+end
+
+namespace prop_thm
+
+lemma or_inl {Γ φ} (ψ) : Γ ⊢ φ → Γ ⊢ (φ ∨ ψ) :=
+begin
+	rw [completeness, completeness],
+	tauto!,
+end
+
+lemma or_inr {Γ ψ} (φ) : Γ ⊢ ψ → Γ ⊢ (φ ∨ ψ) :=
+begin 
+	rw [completeness, completeness],
+	tauto!,
+end
+
+lemma or_e {Γ φ ψ χ}  : Γ ∪ {φ} ⊢ χ → Γ ∪ {ψ} ⊢ χ → Γ ∪ {φ ∨ ψ} ⊢ χ :=
+begin 
+	rw [deduction_thm, deduction_thm, deduction_thm],
+	rw [completeness, completeness, completeness],
+	intros h1 h2 s hs,
+	unfold prop_formula.or value,
+	tauto!,
+end
+
+lemma and_i {Γ} (φ ψ) : Γ ⊢ φ → Γ ⊢ ψ → Γ ⊢ (φ ∧ ψ) :=
+begin 
+	rw [completeness, completeness, completeness],
+	intros h1 h2 s hs h3,
+	unfold prop_formula.or value at h3,
+	tauto!,
+end
+
+lemma and_l {Γ} {φ ψ} : Γ ⊢ (φ ∧ ψ) → Γ ⊢ φ :=
+begin 
+	rw [completeness, completeness],
+	intros h1 s hs,
+	have := h1 (by assumption),
+	unfold prop_formula.and prop_formula.or value at this,
+	tauto!,
+end
+
+lemma and_r {Γ} {φ ψ} : Γ ⊢ (φ ∧ ψ) → Γ ⊢ ψ :=
+begin 
+	rw [completeness, completeness],
+	intros h1 s hs,
+	have := h1 (by assumption),
+	unfold prop_formula.and prop_formula.or value at this,
+	tauto!,
+end
+
+end prop_thm
+
+theorem de_morgan_1 {φ ψ : prop_formula} : ∅ ⊢ ((¬)(φ ∧ ψ) ↔ (¬φ ∨ ¬ψ)) := 
+begin 
+	rw completeness,
+	intros s hs,
+	unfold prop_formula.and prop_formula.iff prop_formula.or value,
+	tauto!,
+end
+
+theorem de_morgan_2 {φ ψ : prop_formula} : ∅ ⊢ ((¬)(φ ∨ ψ) ↔ (¬φ ∧ ¬ψ)) := 
+begin 
+	rw completeness,
+	intros s hs,
+	unfold prop_formula.and prop_formula.iff prop_formula.or value,
 	tauto!,
 end
 
