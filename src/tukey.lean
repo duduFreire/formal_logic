@@ -3,8 +3,8 @@ import order.zorn
 
 variable {α : Type*}
 
-lemma max_of_fin_chain [partial_order α]
-: ∀{c : set α}, c.finite → is_chain (≤) c → c.nonempty → ∃m ∈ c, ∀{b}, b ∈ c → b ≤ m :=
+lemma max_of_fin_chain [partial_order α] :
+∀{c : set α}, c.finite → is_chain (≤) c → c.nonempty → ∃m ∈ c, ∀{b}, b ∈ c → b ≤ m :=
 begin
 	intros c c_fin c_chain c_nonempty,
 	set P : set α → Prop := λx, (∃(x_fin : x.finite) (x_chain : is_chain (≤) x)
@@ -62,7 +62,7 @@ begin
 end
 
 def finite_character (F : set (set α)) : Prop :=
- ∀ X, X ∈ F ↔ (∀{Y : set α}, Y ⊆ X → Y.finite → Y ∈ F)
+∀ X, X ∈ F ↔ (∀ {Y : set α}, Y ⊆ X → Y.finite → Y ∈ F)
 
 variable {F : set (set α)}
 
@@ -74,20 +74,9 @@ begin
 	exact (F_fin_char X).mp hX (set.empty_subset X) set.finite_empty,
 end
 
-lemma nonempty_of_neg_mem_fin_character {Y : set α} : 
-F.nonempty → finite_character F → Y ∉ F → Y.nonempty :=
-begin 
-	intros F_nonempty F_fin_char hYF,
-	cases F_nonempty with X hX,
-	rw← set.ne_empty_iff_nonempty,
-	intro contra,
-	rw contra at hYF,
-	exact hYF (mem_empty_of_fin_character ⟨X, hX⟩ F_fin_char),
-end
-
-lemma exists_maximal_of_finite_character {X} (hX : X ∈ F) :
+lemma max_of_fin_character {X} (hX : X ∈ F) :
  finite_character F → ∃M ∈ F, X ⊆ M ∧ ∀{Y}, Y ∈ F → M ⊆ Y → Y = M :=
- begin 
+begin 
 	intro F_fin_char,
 	apply zorn_subset_nonempty, swap, exact hX,
 
@@ -143,6 +132,5 @@ lemma exists_maximal_of_finite_character {X} (hX : X ∈ F) :
 	},
 
 	intros y hy,
-	use [f y hy], rw sub_chain_def, simp,
-	use [y, hy, rfl, hf y hy],
- end
+	use [f y hy, y, hy, rfl, hf y hy],
+end
