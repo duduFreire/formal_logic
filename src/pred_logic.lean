@@ -62,6 +62,20 @@ def satisfies : assignment M →  formula 𝓛 → Prop
 | s (formula.imp φ ψ) := satisfies s φ → satisfies s ψ
 | s (formula.Exists n φ) := ∃(m : M.domain), satisfies (replace s n m) φ
 
+example {s s' : assignment M} {u : term 𝓛} :
+(∀n, term_vars u n → s n = s' n) → value s u = value s' u :=
+begin 
+	intro h,
+	induction' u with u f g g_func g_args ih,
+	{exact h u rfl},
+	{
+		unfold value,
+		simp,
+		apply congr_arg,
+		sorry,
+	},
+end
+
 lemma satisfies_of_agree_free {s s' : assignment M} (φ : formula 𝓛) : 
 (∀{n}, free_vars φ n → s n = s' n) → satisfies s φ → satisfies s' φ :=
 begin 

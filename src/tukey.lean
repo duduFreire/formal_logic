@@ -5,60 +5,22 @@ variable {α : Type*}
 
 lemma max_of_fin_chain [partial_order α]
 : ∀{c : set α}, c.finite → is_chain (≤) c → c.nonempty → ∃m ∈ c, ∀{b}, b ∈ c → b ≤ m :=
-begin
+begin 
 	intros c c_fin c_chain c_nonempty,
-	set P : set α → Prop := λx, (∃(x_fin : x.finite) (x_chain : is_chain (≤) x)
-	 (x_nonempty : x.nonempty), true) → ∃m ∈ x, ∀{b}, b ∈ x → b ≤ m with P_def,
-
-	have P_empty : P ∅,
+	rcases finset.exists_maximal (set.finite.to_finset c_fin) 
+	((set.finite.nonempty_to_finset c_fin).mpr c_nonempty) with ⟨m, hmc, hm⟩,
+	have hmc' :=(set.finite.mem_to_finset c_fin).mp hmc,
+	use [m, hmc'],
+	intros b hbc,
+	specialize hm b ((set.finite.mem_to_finset c_fin).mpr hbc),
+	unfold is_chain set.pairwise at c_chain,
+	specialize c_chain hbc hmc',
+	by_cases hbm : b = m,
+	{exact (eq.symm hbm).ge},
 	{
-		rw P_def,
-		intro h,
-		rcases h with ⟨a, a, contra, -⟩, exfalso,
-		exact set.not_nonempty_empty contra,
-	},
-
-	suffices h : P c, {exact h ⟨c_fin, c_chain, c_nonempty, true.intro⟩},
-	apply set.finite.induction_on c_fin P_empty,
-	intros a s has s_fin hPs,
-	intro h,
-	rcases h with ⟨as_finite, as_chain, as_nonemtpty, -⟩,
-	have s_chain := is_chain.mono (set.subset_insert a s) as_chain,
-	by_cases s_nonempty : s.nonempty,
-	{
-		rcases hPs ⟨s_fin, s_chain, s_nonempty, true.intro⟩ with ⟨m, hms, hm⟩,
-		by_cases h : a ≤ m,
-		{
-			use [m, set.mem_insert_of_mem a hms],
-			intros b hb,
-			simp at hb,
-			cases hb, {rwa hb},
-			{exact hm hb},
-		},
-		{
-			have hmas : m ∈ (insert a s) := set.mem_insert_of_mem a hms,
-			have haas : a ∈ (insert a s) := set.mem_insert a s,
-			have hma : m ≤ a,
-			{
-				unfold is_chain at as_chain,
-				unfold set.pairwise at as_chain,
-				by_cases m_eq_a : m = a, {rw m_eq_a},
-				specialize as_chain hmas haas m_eq_a,
-				tauto,
-			},
-			use [a, haas],
-			intros b hb, simp at hb,
-			cases hb,
-			{rw hb},
-			{
-				specialize hm hb,
-				exact le_trans hm hma,
-			},
-		},
-	},
-	rw set.not_nonempty_iff_eq_empty at s_nonempty,
-	use [a, set.mem_insert a s], rw s_nonempty,
-	intros b hb, simp at hb, rw hb,
+		cases c_chain hbm, exact h, exfalso,
+		exact hm ((ne.symm hbm).lt_of_le h),
+	}
 end
 
 def finite_character (F : set (set α)) : Prop :=
@@ -72,17 +34,6 @@ begin
 	intros F_nonempty F_fin_char,
 	cases F_nonempty with X hX,
 	exact (F_fin_char X).mp hX (set.empty_subset X) set.finite_empty,
-end
-
-lemma nonempty_of_neg_mem_fin_character {Y : set α} : 
-F.nonempty → finite_character F → Y ∉ F → Y.nonempty :=
-begin 
-	intros F_nonempty F_fin_char hYF,
-	cases F_nonempty with X hX,
-	rw← set.ne_empty_iff_nonempty,
-	intro contra,
-	rw contra at hYF,
-	exact hYF (mem_empty_of_fin_character ⟨X, hX⟩ F_fin_char),
 end
 
 lemma exists_maximal_of_finite_character {X} (hX : X ∈ F) :
