@@ -1,5 +1,7 @@
 import tactic
 
+namespace heyting
+
 universe u
 
 class has_imp (X : Type u) := (imp : X -> X -> X)
@@ -21,13 +23,15 @@ has_bot X, has_top X :=
 
 variables {X : Type u} [heyting X] (a b c x y : X)
 
-@[simp]lemma union_id : a ∪ ⊥ = a := heyting.max_id a
-@[simp]lemma inter_id : a ∩ ⊤ = a := heyting.min_id a
-@[simp]lemma union_self : a ∪ a = a := heyting.max_self a
+@[simp]lemma max_bot : a ∪ ⊥ = a := heyting.max_id a
+@[simp]lemma bot_max : ⊥ ∪ a = a := by {rw _inst_1.max_comm, exact max_bot a}
+@[simp]lemma min_top : a ∩ ⊤ = a := heyting.min_id a
+@[simp]lemma top_min : ⊤ ∩ a = a := by {rw _inst_1.min_comm, exact min_top a}
+@[simp]lemma max_self : a ∪ a = a := heyting.max_self a
 
 instance heyting_le : has_le X := ⟨λa b, a ∪ b = b⟩
 
-@[simp]lemma le_iff : a ∪ b = b ↔ a ≤ b := iff.refl (a ∪ b = b)
+lemma le_iff : a ∪ b = b ↔ a ≤ b := iff.refl (a ∪ b = b)
 
 instance heyting_partial : partial_order X := 
 {
@@ -51,9 +55,21 @@ instance heyting_partial : partial_order X :=
   end
 }
 
-@[simp]lemma inter_self : a ∩ a = a :=
+@[simp]lemma min_bot : a ∩ ⊥ = ⊥ :=
 begin 
-  sorry
+	have := _inst_1.imp_ge,
+	specialize this a ⊥ ⊥,
+	simp at this,
+	exact this,
+end
+
+@[simp]lemma bot_min : ⊥ ∩ a = ⊥ := by {rw _inst_1.min_comm, simp}
+
+@[simp]lemma min_self : a ∩ a = a :=
+begin 
+	suffices : ((a ∪ ⊥) ∩ a) ∪ ((a ∪ ⊥) ∩ ⊥) = a ∪ (⊥ ∩ ⊥),
+	{ simp at *, exact this },
+	rw [←_inst_1.min_dist, ←_inst_1.max_dist],
 end
 
 lemma le_max_self_left : a ≤ a ∪ b :=
@@ -63,7 +79,7 @@ begin
   simp,
 end
 
-lemma le_max_self_right : a ≤ b ∪ a :=
+lemma le_max_self_right : b ≤ a ∪ b :=
 begin 
   rw← le_iff,
   rw _inst_1.max_comm,
@@ -72,32 +88,51 @@ begin
 end
 
 lemma min_le_self_left : a ∩ b ≤ a :=
-begin 
-  rw← le_iff,
-  rw _inst_1.max_comm,
-  rw _inst_1.max_dist,
-  sorry,
+begin
+	rw ← le_iff,
+	suffices : a ∪ ((a ∩ ⊥) ∪ (a ∩ b)) = a ∪ (⊥ ∩ b),
+	{ simp at this,rwa _inst_1.max_comm at this },
+	suffices : ((a ∪ ⊥) ∩ a) ∪ ((a ∪ ⊥) ∩ b) = a ∪ (⊥ ∩ b),
+	{simp at *, exact this},
+	rw← _inst_1.min_dist,
+	rw _inst_1.max_dist,
 end
 
-lemma union_top : a ∪ ⊤ = ⊤ := sorry
-
-lemma le_min_of_le : a ≤ c → a ∩ b ≤ c :=
-begin 
-  intro h,
-  rw← le_iff at *,
-  rw _inst_1.max_comm,
-  rw _inst_1.max_dist,
-  rw _inst_1.max_comm at h,
-  rw h,
-  sorry,
+lemma min_le_self_right : a ∩ b ≤ b :=
+begin
+	rw _inst_1.min_comm,
+	exact min_le_self_left b a,
 end
 
-@[simp]lemma le_inter_iff : a ≤ b ∩ c ↔ a ≤ b ∧ a ≤ c :=
+lemma le_min_of_le : a ≤ c → a ∩ b ≤ c := λh, le_trans (min_le_self_left a b) h
+
+@[simp]lemma max_le_iff : a ∪ b ≤ c ↔ a ≤ c ∧ b ≤ c := 
+begin 
+	--rw [←le_iff,←le_iff,←le_iff],
+	split,
+	{
+		intro h,
+		have h1 := le_max_self_left a b,
+		have h2 := le_max_self_right a b,
+		exact ⟨le_trans h1 h, le_trans h2 h⟩,
+	},
+	{
+    intro h,
+    cases h with h1 h2,
+    rw← le_iff at *,
+		rw← _inst_1.max_assoc,
+		rwa h2,
+	},
+end
+
+@[simp]lemma le_min_iff : a ≤ b ∩ c ↔ a ≤ b ∧ a ≤ c :=
 begin 
   split,
   {
     intro h,
-    sorry,
+		have h1 := min_le_self_left b c,
+		have h2 := min_le_self_right b c,
+		exact ⟨le_trans h h1, le_trans h h2⟩,
   },
   {
     intro h,
@@ -107,3 +142,19 @@ begin
     rw h1, rw h2,
   }
 end
+
+@[simp]lemma max_top : a ∪ ⊤ = ⊤ :=
+begin 
+	have := min_le_self_left ⊤ a,
+	rw← le_iff at this,
+	simp at this,
+	exact this,
+end
+
+@[simp]lemma top_max : ⊤ ∪ a = ⊤ :=
+begin 
+	rw _inst_1.max_comm,
+	exact max_top a,
+end
+
+end heyting
