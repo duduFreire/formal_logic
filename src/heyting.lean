@@ -104,7 +104,7 @@ begin
 	exact min_le_self_left b a,
 end
 
-lemma le_min_of_le : a ≤ c → a ∩ b ≤ c := λh, le_trans (min_le_self_left a b) h
+lemma le_min_of_le {a c} : a ≤ c → a ∩ b ≤ c := λh, le_trans (min_le_self_left a b) h
 
 @[simp]lemma max_le_iff : a ∪ b ≤ c ↔ a ≤ c ∧ b ≤ c := 
 begin 
@@ -155,6 +155,84 @@ end
 begin 
 	rw _inst_1.max_comm,
 	exact max_top a,
+end
+
+def upper_bound (A : set X) (x : X) := ∀{a}, a ∈ A → a ≤ x 
+def lower_bound (A : set X) (x : X) := ∀{a}, a ∈ A → x ≤ a 
+def supremum (A : set X) (x : X) := upper_bound A x ∧ ∀{s}, upper_bound A s → x ≤ s
+def infimum (A : set X) (x : X) := lower_bound A x ∧ ∀{s}, lower_bound A s → s ≤ x
+
+lemma infimum_empty : infimum (∅ : set X) ⊤ :=
+begin 
+	split,
+	{ intros x hx, exfalso, exact set.not_mem_empty x hx },
+	{
+		intros s' hs',
+		rw← heyting.le_iff,
+		simp,
+	}
+end
+
+lemma infimum_insert {B : set X} {a t : X} (ht : infimum B t) : infimum (insert a B) (t ∩ a) :=
+begin 
+	split,
+	{
+	intros x hx,
+	simp at *,
+	cases hx,
+	{
+		rw hx,
+		exact min_le_self_right t a,
+	},
+	{
+		cases ht with ht1 ht2,
+		have h1 := ht1 hx,
+		exact le_min_of_le a (ht1 hx),
+	},
+	},
+	{
+	intros s' hs',
+	simp,
+	have : lower_bound B s',
+	{
+		intros y hy,
+		exact hs' (set.mem_insert_of_mem a hy),
+	},
+		exact ⟨ht.2 (by assumption), hs' (set.mem_insert a B)⟩,
+	}
+end
+
+lemma has_infimum_of_finite {A : set X} (A_fin : set.finite A) : ∃ s, infimum A s :=
+begin 
+	refine set.finite.induction_on A_fin ⟨⊤, infimum_empty⟩ _,
+	{
+		intros a B has B_fin ih,
+		rcases ih with ⟨t, ht⟩,
+		use t ∩ a,
+		exact infimum_insert ht,
+	}
+end
+
+noncomputable def infimum_of_finite {A : set X} (A_fin : set.finite A) :=
+ classical.some (has_infimum_of_finite A_fin)
+
+def infimum_of_finite_spec {A : set X} (A_fin : set.finite A) := 
+ classical.some_spec (has_infimum_of_finite A_fin)
+
+lemma infimum_iff {A : set X} (A_fin : set.finite A) (s : X) : 
+infimum A s ↔ s = infimum_of_finite A_fin :=
+begin 
+	split,
+	{
+		intro h,
+		have h_inf : infimum A (infimum_of_finite A_fin) := infimum_of_finite_spec A_fin,
+		exact ge_antisymm (h.2 h_inf.1) (h_inf.2 h.1),
+	},
+	{
+		intro h,
+		rw h,
+		exact infimum_of_finite_spec A_fin,
+	}
 end
 
 end heyting

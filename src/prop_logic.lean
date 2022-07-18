@@ -14,7 +14,7 @@ notation ⊥ := prop_formula.bot
 notation ¬ := λp : prop_formula, p.imp ⊥
 infixr ` ->> `:5 := prop_formula.imp
 
-inductive prop_thm : set prop_formula → prop_formula → Prop 
+inductive prop_thm  : set prop_formula → prop_formula → Prop
 | ax : ∀{Γ p}, p ∈ Γ → prop_thm Γ p
 | imp_i : ∀{Γ p q}, prop_thm (Γ ∪ {p}) q → prop_thm Γ (p ->> q)
 | imp_e : ∀{Γ p q}, prop_thm Γ (p ->> q) → prop_thm Γ p → prop_thm Γ q
@@ -23,7 +23,7 @@ inductive prop_thm : set prop_formula → prop_formula → Prop
 
 infix ` ⊢ `:50 := prop_thm
 
-notation `assignment` := ℕ → Prop
+def assignment := ℕ → Prop
 
 def value (s : assignment) : prop_formula → Prop
 | ⊥ := false
