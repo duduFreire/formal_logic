@@ -220,7 +220,10 @@ begin
 		(set.finite.image (@value H _inst_2 s) Γ_fin),
 		exact h_inf.1 this,
 	},
-	repeat {sorry},
+	{
+		intros s,
+		have ih2 := @ih H _inst_2 (by finish) s,
+	}
 end
 
 

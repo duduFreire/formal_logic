@@ -11,7 +11,7 @@ infix ` => `:50 := has_imp.imp
 class heyting (X : Type u) extends has_inter X, has_union X, has_imp X,
 has_bot X, has_top X :=
 (max_assoc : ∀a b c : X, a ∪ (b ∪ c) = (a ∪ b) ∪ c)
-(min_assoc : ∀a b c : X, a ∩ (b ∩ c) = (a ∩ b) ∪ c)
+(min_assoc : ∀a b c : X, a ∩ (b ∩ c) = (a ∩ b) ∩ c)
 (max_comm : ∀a b : X, a ∪ b = b ∪ a)
 (min_comm : ∀a b : X, a ∩ b = b ∩ a)
 (min_dist : ∀a b c : X, a ∩ (b ∪ c) = (a ∩ b) ∪ (a ∩ c))
@@ -212,6 +212,21 @@ begin
 		exact infimum_insert ht,
 	}
 end
+
+instance min_comm_inst : 
+@is_commutative X (heyting.to_has_inter).inter := ⟨λ a b, heyting.min_comm a b⟩ 
+
+instance min_assoc_inst : 
+@is_associative X (heyting.to_has_inter).inter := ⟨λ a b c, eq.symm (heyting.min_assoc a b c)⟩ 
+
+-- def awaeawe {A : set X}  (A_fin : set.finite A) : Prop :=
+-- begin 
+-- 	have := A_fin.to_finset.val,
+-- end
+
+-- def testaa  {A : set X} : A.finite → X := λ A_fin,
+-- @multiset.fold X (@has_inter.inter X (heyting.to_has_inter))
+-- 	 (@heyting.min_comm_inst X _inst_1) (@heyting.min_assoc_inst X _inst_1) ⊤ A_fin.to_finset.val
 
 noncomputable def infimum_of_finite {A : set X} (A_fin : set.finite A) :=
  classical.some (has_infimum_of_finite A_fin)
