@@ -1,4 +1,5 @@
 import tactic
+import order.zorn
 
 namespace heyting
 
@@ -219,35 +220,152 @@ instance min_comm_inst :
 instance min_assoc_inst : 
 @is_associative X (heyting.to_has_inter).inter := ⟨λ a b c, eq.symm (heyting.min_assoc a b c)⟩ 
 
--- def awaeawe {A : set X}  (A_fin : set.finite A) : Prop :=
--- begin 
--- 	have := A_fin.to_finset.val,
--- end
-
--- def testaa  {A : set X} : A.finite → X := λ A_fin,
--- @multiset.fold X (@has_inter.inter X (heyting.to_has_inter))
--- 	 (@heyting.min_comm_inst X _inst_1) (@heyting.min_assoc_inst X _inst_1) ⊤ A_fin.to_finset.val
-
-noncomputable def infimum_of_finite {A : set X} (A_fin : set.finite A) :=
+noncomputable def infimum_of_finite (A : set X) (A_fin : set.finite A) :=
  classical.some (has_infimum_of_finite A_fin)
 
-def infimum_of_finite_spec {A : set X} (A_fin : set.finite A) := 
+def infimum_of_finite_spec (A : set X) (A_fin : set.finite A) := 
  classical.some_spec (has_infimum_of_finite A_fin)
 
 lemma infimum_iff {A : set X} (A_fin : set.finite A) (s : X) : 
-infimum A s ↔ s = infimum_of_finite A_fin :=
+infimum A s ↔ s = infimum_of_finite A A_fin :=
 begin 
 	split,
 	{
 		intro h,
-		have h_inf : infimum A (infimum_of_finite A_fin) := infimum_of_finite_spec A_fin,
+		have h_inf : infimum A (infimum_of_finite A A_fin) := infimum_of_finite_spec A A_fin,
 		exact ge_antisymm (h.2 h_inf.1) (h_inf.2 h.1),
 	},
 	{
 		intro h,
 		rw h,
-		exact infimum_of_finite_spec A_fin,
+		exact infimum_of_finite_spec A A_fin,
 	}
 end
+
+variables {H : Type u} [heyting H]
+structure filter (F : set H) : Prop :=
+(mem_inter : ∀ {a b}, a ∈ F → b ∈ F → a ∩ b ∈ F)
+(mem_ge : ∀ {a b}, a ∈ F → a ≤ b → b ∈ F)
+
+structure prime_filter (F : set H) extends filter F : Prop :=
+(mem_union : ∀ {a b}, a ∪ b ∈ F → a ∈ F ∨ b ∈ F)
+
+lemma smallest_filter_insert {F : set H} (F_filter : filter F) 
+(F_nonempty : F.nonempty) (b : H)  : 
+let F' := {a : H | ∃c : H, c ∈ F ∧ b ∩ c ≤ a} in
+filter F' ∧ F ∪ {b} ⊆ F' ∧ ∀ {G : set H}, filter G → F ∪ {b} ⊆ G → F' ⊆ G :=
+begin 
+	split, fconstructor,
+	{
+		intros x y hx hy,
+		simp at *,
+		rcases hx with ⟨c, hc, hcx⟩,
+		rcases hy with ⟨d, hd, hdy⟩,
+		use [c ∩ d, F_filter.mem_inter hc hd],
+		split,
+		{ rw heyting.min_assoc, exact le_min_of_le d hcx },
+		{
+			rw [heyting.min_assoc, heyting.min_comm b c,
+			 ←heyting.min_assoc, heyting.min_comm],
+			 exact le_min_of_le c hdy,
+		},
+	},
+	{
+		intros x y hx hxy,
+		simp at *,
+		rcases hx with ⟨c, hc, hcx⟩,
+		use [c, hc, le_trans hcx hxy],
+	}, split,
+	{
+		intros x hx,
+		simp at *,
+		cases hx,
+		{
+			use ⊤, split,
+			{
+				cases set.nonempty_def.mp F_nonempty with f hf,
+				apply F_filter.mem_ge hf,
+				rw← le_iff,
+				simp,
+			},
+			{ rw hx, simp }
+		},
+		{
+			use [x, hx], 
+			exact min_le_self_right b x,
+		},
+	},
+	{
+		intros G G_filter G_sup x hx,
+		simp at hx,
+		rcases hx with ⟨c, hc, hcx⟩,
+		have hcG : c ∈ G := G_sup (or.inl hc),
+		have hbG : b ∈ G := by {apply G_sup, simp},
+		exact G_filter.mem_ge (G_filter.mem_inter hbG hcG) hcx,
+	}
+end
+
+lemma exists_big_prime_filter {F : set H} (F_filter : filter F)
+(F_nonempty : F.nonempty) {a : H} (haF : a ∉ F) :
+∃ (M : set H), prime_filter M ∧ F ⊆ M ∧ a ∉ M :=
+begin 
+	set A := {G : set H | filter G ∧ a ∉ G} with A_def,
+	have hFA : F ∈ A := by { rw A_def, simp, exact ⟨F_filter, haF⟩ },
+	rcases zorn_subset_nonempty A _ F hFA with ⟨M, hMA, F_sub, M_max⟩,
+	{
+		use M,
+		have M_filter : filter M := by { rw A_def at hMA, simp at hMA, exact hMA.1 },
+		have hMa : a ∉ M := by { rw A_def at hMA, simp at hMA, exact hMA.2 },
+		have M_nonempty : M.nonempty := set.nonempty.mono F_sub F_nonempty,
+		refine ⟨_, F_sub, hMa⟩,
+		fconstructor, { exact M_filter },
+
+		have wlog : ∀ {b c}, b ∪ c ∈ M → b ∉ M → c ∉ M → b ≠ a → false,
+		{
+			intros b c hcup hb hc hba,
+			rcases smallest_filter_insert M_filter M_nonempty b 
+			with ⟨G_filter, G_sup, G_small⟩,
+			by_cases haG : a ∈ {a : H | ∃ (c : H), c ∈ M ∧ b ∩ c ≤ a},
+			{
+				simp at haG,
+				rcases haG with ⟨d, hd, hda⟩,
+				
+				sorry,
+			},
+			{
+				have hGA : {a : H | ∃ (c : H), c ∈ M ∧ b ∩ c ≤ a} ∈ A,
+				{
+					rw A_def, 
+					simp only [set.mem_set_of_eq],
+					use G_filter,
+				},
+				have M_ss_G : M ⊆ {a : H | ∃ (c : H), c ∈ M ∧ b ∩ c ≤ a} :=
+				λ x hx, G_sup (or.inl hx),
+				specialize M_max _ hGA M_ss_G,
+				rw M_max at *,
+				exact hb (G_sup (by finish)),
+			},
+		},
+
+		by_contradiction,
+		push_neg at h,
+		rcases h with ⟨b, c, hcup, hb, hc⟩,
+		have hb_or_c_neq_a : b ≠ a ∨ c ≠ a,
+		{
+			by_contradiction contra,
+			push_neg at contra,
+			rw [contra.1, contra.2] at hcup,
+			simp at hcup,
+			rw A_def at hMA, simp at hMA,
+			exact hMA.2 hcup,
+		},
+
+		cases hb_or_c_neq_a,
+		{ exact wlog hcup hb hc hb_or_c_neq_a },
+		{ rw heyting.max_comm at hcup, exact wlog hcup hc hb hb_or_c_neq_a },
+	},
+	sorry,
+end
+
 
 end heyting

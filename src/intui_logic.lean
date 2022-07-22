@@ -205,7 +205,9 @@ def value (s : assignment H) : prop_formula → H
 | (prop_formula.imp p q) := value p => value q
 
 def intui_implies (H : Type u) [heyting H] {Γ : set prop_formula} (Γ_fin : set.finite Γ) (p : prop_formula) :=
-∀ (s : assignment H), infimum_of_finite (set.finite.image (value s) Γ_fin) ≤ value s p
+∀ (s : assignment H), infimum_of_finite _ (set.finite.image (value s) Γ_fin) ≤ value s p
+
+
 
 lemma pseudo_soundness (H : Type u) [heyting H] (Γ_fin : set.finite Γ) :
  Γ ⊢ p → (intui_implies H Γ_fin p) :=
@@ -213,17 +215,35 @@ begin
 	intro Γ_proves,
 	induction' Γ_proves,
 	{
+		sorry; {
 		intro s,
+		have Γ_img_fin := λs, set.finite.image (@value H _inst_2 s) Γ_fin,
 		have : (@value H _inst_2 s) p ∈ (@value H _inst_2 s ) '' Γ := 
 		set.mem_image_of_mem _ h,
-		have h_inf := @infimum_of_finite_spec H _inst_2 ((@value H _inst_2 s ) '' Γ) 
-		(set.finite.image (@value H _inst_2 s) Γ_fin),
+		have h_inf := @infimum_of_finite_spec _ _inst_2 _ (Γ_img_fin s),
 		exact h_inf.1 this,
+		}
 	},
 	{
 		intros s,
-		have ih2 := @ih H _inst_2 (by finish) s,
-	}
+		have Γ_img_fin := λs, set.finite.image (@value H _inst_2 s) Γ_fin,
+		have Γ_insert : Γ ∪ {p} = insert p Γ := by finish,
+		rw Γ_insert at *,
+
+		have ih2 := @ih _ _inst_2 (by finish) s,
+		have h_inf := @infimum_of_finite_spec _ _inst_2
+		 ((@value H _inst_2 s ) '' (insert p Γ)) _, swap,
+		 {
+			rw← Γ_insert,
+			rw set.image_union (@value H _inst_2 s ),
+			apply set.finite.union, exact Γ_img_fin s,
+			simp,
+		 },
+
+		 sorry,
+	},
+
+	repeat {sorry},
 end
 
 
