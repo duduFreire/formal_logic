@@ -105,7 +105,8 @@ begin
 	exact min_le_self_left b a,
 end
 
-lemma le_min_of_le {a c} : a ≤ c → a ∩ b ≤ c := λh, le_trans (min_le_self_left a b) h
+lemma le_min_of_le_left {a c} : a ≤ c → a ∩ b ≤ c := λ h, le_trans (min_le_self_left a b) h
+lemma le_min_of_le_right {a c} : a ≤ c → b ∩ a ≤ c := λ h, le_trans (min_le_self_right b a) h
 
 @[simp]lemma max_le_iff : a ∪ b ≤ c ↔ a ≤ c ∧ b ≤ c := 
 begin 
@@ -158,6 +159,12 @@ begin
 	exact max_top a,
 end
 
+@[simp]lemma le_bot_iff : a ≤ ⊥ ↔ a = ⊥ :=
+begin 
+	rw← le_iff,
+	simp,
+end
+
 def upper_bound (A : set X) (x : X) := ∀{a}, a ∈ A → a ≤ x 
 def lower_bound (A : set X) (x : X) := ∀{a}, a ∈ A → x ≤ a 
 def supremum (A : set X) (x : X) := upper_bound A x ∧ ∀{s}, upper_bound A s → x ≤ s
@@ -188,7 +195,7 @@ begin
 	{
 		cases ht with ht1 ht2,
 		have h1 := ht1 hx,
-		exact le_min_of_le a (ht1 hx),
+		exact le_min_of_le_left a (ht1 hx),
 	},
 	},
 	{
@@ -247,8 +254,34 @@ structure filter (F : set H) : Prop :=
 (mem_inter : ∀ {a b}, a ∈ F → b ∈ F → a ∩ b ∈ F)
 (mem_ge : ∀ {a b}, a ∈ F → a ≤ b → b ∈ F)
 
+structure proper_filter (F : set H) extends filter F : Prop :=
+(ne_univ : F ≠ set.univ)
+
+lemma proper_filter_iff {F : set H} (F_filter : filter F) : proper_filter F ↔ ∃ a, a ∉ F :=
+⟨λh, (set.ne_univ_iff_exists_not_mem F).mp (h.ne_univ), λ h,
+	{
+		mem_inter := F_filter.mem_inter,
+		mem_ge := F_filter.mem_ge,
+		ne_univ := (set.ne_univ_iff_exists_not_mem F).mpr h
+	}
+⟩
+
+lemma proper_filter_iff_bot_not_in {F : set H} (F_filter : filter F) :
+proper_filter F ↔ ⊥ ∉ F :=
+begin 
+	rw proper_filter_iff F_filter,
+	split,
+	{
+		intros h hbot,
+		cases h with a ha, apply ha, clear ha,
+		exact F_filter.mem_ge hbot (by {rw← le_iff, simp}),
+	},
+	{ exact λ h, ⟨⊥, h⟩ },
+end
+
 structure prime_filter (F : set H) extends filter F : Prop :=
 (mem_union : ∀ {a b}, a ∪ b ∈ F → a ∈ F ∨ b ∈ F)
+
 
 lemma smallest_filter_insert {F : set H} (F_filter : filter F) 
 (F_nonempty : F.nonempty) (b : H)  : 
@@ -263,11 +296,11 @@ begin
 		rcases hy with ⟨d, hd, hdy⟩,
 		use [c ∩ d, F_filter.mem_inter hc hd],
 		split,
-		{ rw heyting.min_assoc, exact le_min_of_le d hcx },
+		{ rw heyting.min_assoc, exact le_min_of_le_left d hcx },
 		{
 			rw [heyting.min_assoc, heyting.min_comm b c,
 			 ←heyting.min_assoc, heyting.min_comm],
-			 exact le_min_of_le c hdy,
+			 exact le_min_of_le_left c hdy,
 		},
 	},
 	{
@@ -305,6 +338,87 @@ begin
 	}
 end
 
+lemma prime_of_maximal_proper_filter {F : set H} (F_filter : filter F) 
+(F_max : ∀ G : set H, proper_filter G → F ⊆ G → G = F) : prime_filter F :=
+{
+	mem_inter := F_filter.mem_inter,
+	mem_ge := F_filter.mem_ge,
+	mem_union := 
+	begin 
+		intros a b hab,
+		by_contra, push_neg at h,
+		have F_nonempty : F.nonempty := set.nonempty_of_mem hab,
+		suffices : ¬ (¬proper_filter {x : H | ∃c : H, c ∈ F ∧ a ∩ c ≤ x} ∧ 
+		¬proper_filter {x : H | ∃c : H, c ∈ F ∧ b ∩ c ≤ x}),
+		{
+			cases or_iff_not_and_not.mpr this,
+			{
+				have temp1 := (smallest_filter_insert F_filter F_nonempty a),
+				have contra := F_max _ h_1 _,
+				{
+					have contra2 : a ∈ {x : H | ∃ (c : H), c ∈ F ∧ a ∩ c ≤ x},
+					{
+						apply temp1.2.1,
+						simp,
+					},
+					rw contra at contra2,
+					exact h.1 contra2,
+				},
+				have := temp1.2.1,
+				intros x hx,
+				exact @this x (or.inl hx),
+			},
+			{
+				have temp1 := (smallest_filter_insert F_filter F_nonempty b),
+				have contra := F_max _ h_1 _,
+				{
+					have contra2 : b ∈ {x : H | ∃ (c : H), c ∈ F ∧ b ∩ c ≤ x},
+					{
+						apply temp1.2.1,
+						simp,
+					},
+					rw contra at contra2,
+					exact h.2 contra2,
+				},
+				have := temp1.2.1,
+				intros x hx,
+				exact @this x (or.inl hx),
+			}
+		},
+		{
+			intro hcontra,
+			have htemp : ∀{k : H}, let F' := {x : H | ∃c : H, c ∈ F ∧ k ∩ c ≤ x} in
+			  filter F' → ¬proper_filter F' → ∃f ∈ F, k ∩ f = ⊥,
+			{
+				intros k F' hF1 hF2,
+				have := (proper_filter_iff_bot_not_in hF1).not_left.mp hF2,
+				simp at this,
+				rcases this with ⟨c, hc1, hc2⟩,
+				exact ⟨c, hc1, hc2⟩,
+			},
+			have := htemp (smallest_filter_insert F_filter F_nonempty a).1 hcontra.1,
+			rcases htemp (smallest_filter_insert F_filter F_nonempty a).1 hcontra.1 with ⟨f1, hf1, hfa⟩,
+			rcases htemp (smallest_filter_insert F_filter F_nonempty b).1 hcontra.2 with ⟨f2, hf2, hfb⟩,
+
+			have hcalc1 : (f1 ∩ f2) ∩ a = ⊥ := 
+			by {rw [heyting.min_comm, heyting.min_assoc, hfa], simp},
+			have hcalc2 : (f1 ∩ f2) ∩ b = ⊥ := 
+			by {rw [←heyting.min_assoc, heyting.min_comm f2 b, hfb], simp},
+
+
+			have := calc (f1 ∩ f2) ∩ (a ∪ b) 
+						= ((f1 ∩ f2) ∩ a) ∪ ((f1 ∩ f2) ∩ b) : heyting.min_dist (f1 ∩ f2) a b
+				... = ⊥ ∪ ⊥ : by rw[hcalc1, hcalc2] 
+				... = ⊥ : by simp,
+			have h1 : (f1 ∩ f2) ∩ (a ∪ b) ∈ F := F_filter.mem_inter (F_filter.mem_inter hf1 hf2) hab,
+			rw this at h1,
+			apply (proper_filter_iff_bot_not_in F_filter).not_left.mpr h1,
+			rw proper_filter_iff F_filter,
+			exact ⟨a, h.1⟩,
+		},
+	end
+}
+
 lemma exists_big_prime_filter {F : set H} (F_filter : filter F)
 (F_nonempty : F.nonempty) {a : H} (haF : a ∉ F) :
 ∃ (M : set H), prime_filter M ∧ F ⊆ M ∧ a ∉ M :=
@@ -319,52 +433,114 @@ begin
 		have M_nonempty : M.nonempty := set.nonempty.mono F_sub F_nonempty,
 		refine ⟨_, F_sub, hMa⟩,
 		fconstructor, { exact M_filter },
-
-		have wlog : ∀ {b c}, b ∪ c ∈ M → b ∉ M → c ∉ M → b ≠ a → false,
+		intros b c hab,
+		by_contra hcontra,
+		push_neg at hcontra, cases hcontra with hbM hcM,
+		suffices : a ∉ {x : H | ∃d : H, d ∈ M ∧ b ∩ d ≤ x} ∨ a ∉ {x : H | ∃d : H, d ∈ M ∧ c ∩ d ≤ x},
 		{
-			intros b c hcup hb hc hba,
-			rcases smallest_filter_insert M_filter M_nonempty b 
-			with ⟨G_filter, G_sup, G_small⟩,
-			by_cases haG : a ∈ {a : H | ∃ (c : H), c ∈ M ∧ b ∩ c ≤ a},
+			cases this,
 			{
-				simp at haG,
-				rcases haG with ⟨d, hd, hda⟩,
-				
-				sorry,
-			},
-			{
-				have hGA : {a : H | ∃ (c : H), c ∈ M ∧ b ∩ c ≤ a} ∈ A,
+				have hGA : {x : H | ∃ (d : H), d ∈ M ∧ b ∩ d ≤ x} ∈ A,
 				{
-					rw A_def, 
-					simp only [set.mem_set_of_eq],
-					use G_filter,
+					rw A_def, rw set.mem_set_of,
+					exact ⟨(smallest_filter_insert M_filter M_nonempty b).1, this⟩,
 				},
-				have M_ss_G : M ⊆ {a : H | ∃ (c : H), c ∈ M ∧ b ∩ c ≤ a} :=
-				λ x hx, G_sup (or.inl hx),
-				specialize M_max _ hGA M_ss_G,
-				rw M_max at *,
-				exact hb (G_sup (by finish)),
+
+				have temp := (smallest_filter_insert M_filter M_nonempty b).2.1,
+				have M_ss : M ⊆ {a : H | ∃ (c : H), c ∈ M ∧ b ∩ c ≤ a},
+				{
+					intros x hx,
+					exact (smallest_filter_insert M_filter M_nonempty b).2.1 (or.inl hx),
+				},
+
+				rw M_max _ hGA M_ss at *,
+				exact hbM (@temp b (or.inr (set.mem_singleton b))),
+			},
+			{
+				have hGA : {x : H | ∃ (d : H), d ∈ M ∧ c ∩ d ≤ x} ∈ A,
+				{
+					rw A_def, rw set.mem_set_of,
+					exact ⟨(smallest_filter_insert M_filter M_nonempty c).1, this⟩,
+				},
+
+				have temp := (smallest_filter_insert M_filter M_nonempty c).2.1,
+				have M_ss : M ⊆ {a : H | ∃ (d : H), d ∈ M ∧ c ∩ d ≤ a},
+				{
+					intros x hx,
+					exact (smallest_filter_insert M_filter M_nonempty c).2.1 (or.inl hx),
+				},
+
+				rw M_max _ hGA M_ss at *,
+				exact hcM (@temp c (or.inr (set.mem_singleton c))),
 			},
 		},
 
-		by_contradiction,
-		push_neg at h,
-		rcases h with ⟨b, c, hcup, hb, hc⟩,
-		have hb_or_c_neq_a : b ≠ a ∨ c ≠ a,
+		rw or_iff_not_and_not,
+		intro h, simp at h,
+		rcases h with ⟨⟨m1, hm1⟩, ⟨m2, hm2⟩⟩,
+		have t1 : (m1 ∩ m2) ∩ b ≤ a,
 		{
-			by_contradiction contra,
-			push_neg at contra,
-			rw [contra.1, contra.2] at hcup,
-			simp at hcup,
-			rw A_def at hMA, simp at hMA,
-			exact hMA.2 hcup,
+			rw [heyting.min_comm m1 m2, ←heyting.min_assoc, heyting.min_comm m1 b],
+			exact heyting.le_min_of_le_right m2 hm1.2,
 		},
-
-		cases hb_or_c_neq_a,
-		{ exact wlog hcup hb hc hb_or_c_neq_a },
-		{ rw heyting.max_comm at hcup, exact wlog hcup hc hb hb_or_c_neq_a },
+		have t2 : (m1 ∩ m2) ∩ c ≤ a,
+		{
+			rw [←heyting.min_assoc, heyting.min_comm m2 c],
+			exact heyting.le_min_of_le_right m1 hm2.2,
+		},
+		have t3 := calc (m1 ∩ m2) ∩ (b ∪ c) =
+			((m1 ∩ m2) ∩ b) ∪ ((m1 ∩ m2) ∩ c) : heyting.min_dist (m1 ∩ m2) b c,
+		have t4 : m1 ∩ m2 ∩ b ∪ m1 ∩ m2 ∩ c ≤ a,
+		{
+			rw heyting.max_le_iff,
+			exact ⟨t1, t2⟩,
+		},
+		have t5 : m1 ∩ m2 ∩ b ∪ m1 ∩ m2 ∩ c ∈ M,
+		{
+			rw← t3,
+			exact M_filter.mem_inter (M_filter.mem_inter hm1.1 hm2.1) hab,
+		},
+		exact hMa (M_filter.mem_ge t5 t4),
 	},
-	sorry,
+	intros chain chain_ss chain_chain chain_nonempty,
+
+	have filter_of_mem_chain : ∀ {F}, F ∈ chain → filter F,
+	{
+		intros F hF,
+		have := chain_ss hF, rw A_def at this, simp at this,
+		exact this.1,
+	},
+
+	use ⋃₀ chain,
+	split,
+	{
+		rw A_def, simp, split,
+		{
+			fconstructor,
+			{
+				intros a b ha hb,
+				rcases ha with ⟨F, F_chain, hFa⟩,
+				rcases hb with ⟨G, G_chain, hGb⟩,
+				cases is_chain.total chain_chain F_chain G_chain,
+				{ exact ⟨G, G_chain, (filter_of_mem_chain G_chain).mem_inter (h hFa) hGb⟩ },
+				{ exact ⟨F, F_chain, (filter_of_mem_chain F_chain).mem_inter hFa (h hGb)⟩ },
+			},
+			{
+				intros a b ha hab,
+				rcases ha with ⟨F, F_chain, hFa⟩,
+				exact ⟨F, F_chain, (filter_of_mem_chain F_chain).mem_ge hFa hab⟩,
+			},
+		},
+		{
+			intros F F_chain,
+			have := chain_ss F_chain, rw A_def at this, simp at this,
+			exact this.2,
+		},
+	},
+	{
+		intros F F_chain a ha,
+		exact ⟨F, F_chain, ha⟩
+	}
 end
 
 
