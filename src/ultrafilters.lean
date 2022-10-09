@@ -1,4 +1,5 @@
 import tactic
+import tukey
 
 open function set
 
@@ -58,6 +59,7 @@ end
 def fip (A : set (set α)) : Prop := ∀ {B}, B ⊆ A → B.finite → ⋂₀ B ≠ ∅
 
 def proper_filter (F : filter α) : Prop := ∅ ∉ F
+
 lemma proper_iff_not_univ (F : filter α) : proper_filter F ↔ F.sets ≠ univ :=
 begin 
 	split,
@@ -74,6 +76,27 @@ begin
 		intro _, 
 		exact F.sets_of_superset contra (empty_subset x),
 	}
+end
+
+lemma fip_iff_proper_filter (F : filter α) : fip F.sets ↔ proper_filter F :=
+begin 
+	split; intro h,
+	{
+		intro contra,
+		have : {∅} ⊆ F.sets,
+		{
+			rw singleton_subset_iff,
+			exact contra,
+		},
+		apply h this (finite_singleton ∅),
+		rw sInter_singleton,
+	},
+	{
+		intros A A_ss A_fin contra,
+		have := fin_inter_sets A_ss A_fin,
+		rw contra at this,
+		exact h this,
+	},
 end
 
 def filter_containing (A : set (set α)) : filter α :=
@@ -319,5 +342,176 @@ begin
 	},
 end
 
+theorem ultrafilter_of_proper_filter {F : filter α} (F_proper : proper_filter F) :
+∃ {U : filter α} (hFU : F.sets ⊆ U.sets), ultrafilter U :=
+begin 
+	have F_fip_set : F.sets ∈ {G : set (set α) | fip G},
+	{
+		rwa [mem_set_of_eq, fip_iff_proper_filter],
+	},
+
+	have F_fip : fip F.sets := by finish[(@fip_iff_proper_filter _ F).mpr F_proper],
+
+	have := @exists_maximal_of_finite_character _ {G : set (set α) | fip G} F.sets (by assumption) _,
+	swap,
+	{
+		intros G,
+		simp,
+		split,
+		{
+			intros G_fip Y Y_ss Y_fin A A_ss A_fin,
+			exact G_fip (subset.trans A_ss Y_ss) A_fin,
+		},
+		{
+			intros hG A A_ss A_fin,
+			exact @hG A A_ss A_fin _ (subset_refl A) A_fin,
+		}
+	},
+
+	rcases this with ⟨U, U_fip, hFU, U_max⟩,
+	have U_proper : proper_filter (filter_containing U),
+	{
+		rw filter_containing_proper_iff,
+		simpa,
+	},
+
+	use [filter_containing U, subset.trans hFU (subset_of_filter_containing U), U_proper],
+
+	intros A,
+	by_contra hA, push_neg at hA,
+	have or_fip : fip (insert A U) ∨ fip (insert Aᶜ U),
+	{
+		suffices hInter : 
+		(∀{y}, y ∈ filter_containing U → y ∩ A ≠ ∅) ∨ (∀{y}, y ∈ filter_containing U → y ∩ Aᶜ ≠ ∅),
+		{
+			unfold fip,
+			by_contra hfip, push_neg at hfip,
+			rcases hfip with ⟨⟨B₁, B₁_ss, B₁_fin, hB₁⟩, ⟨B₂, B₂_ss, B₂_fin, hB₂⟩⟩,
+
+			have hAB₁ : A ∈ B₁,
+			{
+				by_contra hAB₁,
+				have B₁_ss_U : B₁ ⊆ (filter_containing U).sets,
+				{
+					suffices : B₁ ⊆ U,
+					{
+						exact subset.trans this (subset_of_filter_containing U),
+					},
+					intros x hx,
+					specialize B₁_ss hx, simp at B₁_ss,
+					cases B₁_ss, exfalso, rw← B₁_ss at hAB₁, exact hAB₁ hx,
+					exact B₁_ss,
+				},
+				rw← fip_iff_proper_filter at U_proper,
+				exact (U_proper B₁_ss_U B₁_fin) hB₁,
+			},
+
+			have hAB₂ : Aᶜ ∈ B₂,
+			{
+				by_contra hAB₂,
+				have B₂_ss_U : B₂ ⊆ (filter_containing U).sets,
+				{
+					suffices : B₂ ⊆ U,
+					{
+						exact subset.trans this (subset_of_filter_containing U),
+					},
+					intros x hx,
+					specialize B₂_ss hx, simp at B₂_ss,
+					cases B₂_ss, exfalso, rw← B₂_ss at hAB₂, exact hAB₂ hx,
+					exact B₂_ss,
+				},
+				rw← fip_iff_proper_filter at U_proper,
+				exact (U_proper B₂_ss_U B₂_fin) hB₂,
+			},
+
+			have hB₁_cup : B₁ = (B₁ \ {A})  ∪ {A}  := by finish,
+			have hB₂_cup : B₂ = (B₂ \ {Aᶜ}) ∪ {Aᶜ} := by finish,
+			have inter₁_sets : ⋂₀ (B₁ \ {A}) ∈ filter_containing U,
+			{
+				have hss : B₁ \ {A} ⊆ (filter_containing U).sets,
+				{
+					suffices : B₁ \ {A} ⊆ U,
+					{ exact subset_trans this (subset_of_filter_containing U) },
+					intros x hx, simp at hx,
+					specialize B₁_ss hx.1, simp at B₁_ss,
+					tauto,
+				},
+				exact fin_inter_sets hss (finite.diff B₁_fin _),
+			},
+			have inter₂_sets : ⋂₀ (B₂ \ {Aᶜ}) ∈ filter_containing U,
+			{
+				have hss : B₂ \ {Aᶜ} ⊆ (filter_containing U).sets,
+				{
+					suffices : B₂ \ {Aᶜ} ⊆ U,
+					{ exact subset_trans this (subset_of_filter_containing U) },
+					intros x hx, simp at hx,
+					specialize B₂_ss hx.1, simp at B₂_ss,
+					tauto,
+				},
+				exact fin_inter_sets hss (finite.diff B₂_fin _),
+			},
+
+			cases hInter,
+			{
+				rw hB₁_cup at hB₁,
+				rw sInter_union at hB₁, simp at hB₁,
+				exact (hInter inter₁_sets) hB₁,
+			},
+			{
+				rw hB₂_cup at hB₂,
+				rw sInter_union at hB₂, simp at hB₂,
+				exact (hInter inter₂_sets) hB₂,
+			},
+		},
+		by_contra hcontra, push_neg at hcontra,
+		rcases hcontra with ⟨⟨y₁, hy₁U, hy₁A⟩, ⟨y₂, hy₂U, hy₂A⟩⟩,
+		have inter_sets : y₁ ∩ y₂ ∈ filter_containing U := (filter_containing U).inter_sets hy₁U hy₂U,
+		have inter_empty : y₁ ∩ y₂ = ∅,
+		{
+			rw eq_empty_iff_forall_not_mem at ⊢ hy₁A hy₂A,
+			intros x hx, simp at hx,
+			by_cases x ∈ A,
+			{ exact hy₁A _ ⟨hx.1, h⟩ },
+			{ exact hy₂A _ ⟨hx.2, h⟩ },
+		},
+		apply U_proper,
+		rwa inter_empty at inter_sets,
+	},
+
+	cases or_fip,
+	{
+		have hAU : A ∉ U := λ h, hA.1 ((subset_of_filter_containing U) h),
+		have : insert A U = U,
+		{
+			apply @U_max;
+			simp,
+			assumption,
+		},
+		rw← this at hAU,
+		apply hAU,
+		exact mem_insert _ _,
+	},
+	{
+		have hAU : Aᶜ ∉ U := λ h, hA.2 ((subset_of_filter_containing U) h),
+		have : insert Aᶜ U = U,
+		{
+			apply @U_max;
+			simp,
+			assumption,
+		},
+		rw← this at hAU,
+		apply hAU,
+		exact mem_insert _ _,
+	},
+end
+
+theorem ultrafilter_of_fip {A : set (set α)} (A_fip : fip A) : 
+∃(U : filter α) (hAU : A ⊆ U.sets), ultrafilter U :=
+begin 
+	rcases ultrafilter_of_proper_filter ((filter_containing_proper_iff _).mpr (by assumption))
+	with ⟨U, hAU, hU⟩,
+	refine ⟨U, _, hU⟩,
+	exact subset_trans (subset_of_filter_containing A) hAU,
+end
 
 end ultrafilter
