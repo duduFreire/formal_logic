@@ -4,6 +4,7 @@ This project contains formalizations of some of the introductory results of math
 Goals achieved:
 * Tukey's Lemma.
 * Soundness and Completeness of classical propositional logic.
+* Ultrafilter Lemma.
 
 Goals remaining:
 * Soundness and Completeness of intuitionistic propositional logic with respect to Heyting semantics.
