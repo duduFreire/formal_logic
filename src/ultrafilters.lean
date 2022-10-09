@@ -56,7 +56,10 @@ begin
 	}
 end
 
-def fip (A : set (set α)) : Prop := ∀ {B}, B ⊆ A → B.finite → ⋂₀ B ≠ ∅
+def fip (A : set (set α)) : Prop := ∀ ⦃B⦄, B ⊆ A → B.finite → ⋂₀ B ≠ ∅
+
+lemma fip_of_subset_fip {A B : set (set α)} (hAB : A ⊆ B) (B_fip : fip B) : fip A :=
+λ C hCA C_fin, B_fip (subset.trans hCA hAB) C_fin
 
 def proper_filter (F : filter α) : Prop := ∅ ∉ F
 
@@ -189,7 +192,113 @@ def maximal_proper_filter (F : filter α) := proper_filter F ∧
 		rw ←this,
 		exact F.inter_sets contra hx
 	},
- end 
+ end
+
+ lemma fip_insert_of_proper_filter {F : filter α} (F_proper : proper_filter F) (x : set α) :
+ fip (insert x F.sets) ∨ fip (insert xᶜ F.sets) :=
+ begin 
+	suffices : (∀{y}, y ∈ F → y ∩ x ≠ ∅) ∨ (∀{y}, y ∈ F → y ∩ xᶜ ≠ ∅),
+	{
+		cases this,
+		{
+			left,
+			intros A A_ss A_fin hA,
+			have hxA : x ∈ A,
+			{
+				by_contra,
+				have A_ss_F : A ⊆ F.sets,
+				{
+					intros y hy,
+					have := A_ss hy,
+					simp at *,
+					cases this, exfalso, rw this_1 at hy, exact h hy,
+					exact this_1,
+				},
+				have := fin_inter_sets A_ss_F A_fin,
+				rw hA at this,
+				apply F_proper,
+				exact this,
+			},
+			have triv : A = (A \ {x}) ∪ {x},
+			{
+				ext y,
+				simp,
+				split;finish
+			},
+			rw triv at hA, clear triv,
+			rw sInter_union at hA,
+			rw sInter_singleton at hA,
+			have A'_ss : A \ {x} ⊆ F.sets,
+			{
+				intros y hy,
+				simp at hy,
+				have := A_ss hy.1,
+				simp at this ⊢,
+				tauto,
+			},
+			have A'_fin : (A \ {x}).finite := finite.diff A_fin _,
+			have hA'F := fin_inter_sets A'_ss A'_fin,
+			exact (this hA'F) hA,
+		},
+		{
+			right,
+			intros A A_ss A_fin hA,
+			have hxA : xᶜ ∈ A,
+			{
+				by_contra,
+				have A_ss_F : A ⊆ F.sets,
+				{
+					intros y hy,
+					have := A_ss hy,
+					simp at *,
+					cases this, exfalso, rw this_1 at hy, exact h hy,
+					exact this_1,
+				},
+				have := fin_inter_sets A_ss_F A_fin,
+				rw hA at this,
+				apply F_proper,
+				exact this,
+			},
+			have triv : A = (A \ {xᶜ}) ∪ {xᶜ},
+			{
+				ext y,
+				simp,
+				split;finish
+			},
+			rw triv at hA, clear triv,
+			rw sInter_union at hA,
+			rw sInter_singleton at hA,
+			have A'_ss : A \ {xᶜ} ⊆ F.sets,
+			{
+				intros y hy,
+				simp at hy,
+				have := A_ss hy.1,
+				simp at this ⊢,
+				tauto,
+			},
+			have A'_fin : (A \ {xᶜ}).finite := finite.diff A_fin _,
+			have hA'F := fin_inter_sets A'_ss A'_fin,
+			exact (this hA'F) hA,
+		},
+	},
+	
+	by_contra h, push_neg at h,
+	rcases h with ⟨⟨Y₁, Y₁F, Y₁_empty⟩, ⟨Y₂, Y₂F, Y₂_empty⟩⟩,
+	have contra : Y₁ ∩ Y₂ = ∅,
+	{
+		rw eq_empty_iff_forall_not_mem at *,
+		intros y hy,
+		simp at hy,
+		by_cases y ∈ x,
+		{ exact Y₁_empty _ ⟨hy.1, h⟩ },
+		{ exact Y₂_empty _ ⟨hy.2, h⟩ },
+	},
+	have inter_sets := F.inter_sets Y₁F Y₂F,
+	rw contra at inter_sets,
+	apply F_proper,
+	exact inter_sets,
+ end
+
 
 lemma ultrafilter_iff_maximal_proper_filter (F : filter α) : 
 ultrafilter F ↔ maximal_proper_filter F :=
@@ -209,137 +318,35 @@ begin
 	},
 	{
 		intro hF, use hF.1, intros x, by_contra hx, push_neg at hx,
-		suffices hfip : fip (insert x F.sets) ∨ fip (insert xᶜ F.sets),
+		have hfip := fip_insert_of_proper_filter hF.1 x,
+		cases hfip,
 		{
-			cases hfip,
+			have F_le : F ≤ filter_containing (insert x F.sets),
 			{
-				have F_le : F ≤ filter_containing (insert x F.sets),
-				{
-					intros y hy,
-					exact subset_of_filter_containing _ (mem_insert_of_mem _ hy),
-				},
-				have := (filter_containing_proper_iff _).mpr (by assumption),
-				have := (hF.2 this) F_le,
-				apply hx.1,
-				rw this,
-				apply subset_of_filter_containing,
-				exact mem_insert _ _,
+				intros y hy,
+				exact subset_of_filter_containing _ (mem_insert_of_mem _ hy),
 			},
-			{
-				have F_le : F ≤ filter_containing (insert xᶜ F.sets),
-				{
-					intros y hy,
-					exact subset_of_filter_containing _ (mem_insert_of_mem _ hy),
-				},
-				have := (filter_containing_proper_iff _).mpr (by assumption),
-				have := (hF.2 this) F_le,
-				apply hx.2,
-				rw this,
-				apply subset_of_filter_containing,
-				exact mem_insert _ _,
-			},
+			have := (filter_containing_proper_iff _).mpr (by assumption),
+			have := (hF.2 this) F_le,
+			apply hx.1,
+			rw this,
+			apply subset_of_filter_containing,
+			exact mem_insert _ _,
 		},
-		suffices : (∀{y}, y ∈ F → y ∩ x ≠ ∅) ∨ (∀{y}, y ∈ F → y ∩ xᶜ ≠ ∅),
 		{
-			cases this,
+			have F_le : F ≤ filter_containing (insert xᶜ F.sets),
 			{
-				left,
-				intros A A_ss A_fin hA,
-				have hxA : x ∈ A,
-				{
-					by_contra,
-					have A_ss_F : A ⊆ F.sets,
-					{
-						intros y hy,
-						have := A_ss hy,
-						simp at *,
-						cases this, exfalso, rw this_1 at hy, exact h hy,
-						exact this_1,
-					},
-					have := fin_inter_sets A_ss_F A_fin,
-					rw hA at this,
-					apply hF.1,
-					exact this,
-				},
-				have triv : A = (A \ {x}) ∪ {x},
-				{
-					ext y,
-					simp,
-					split;finish
-				},
-				rw triv at hA, clear triv,
-				rw sInter_union at hA,
-				rw sInter_singleton at hA,
-				have A'_ss : A \ {x} ⊆ F.sets,
-				{
-					intros y hy,
-					simp at hy,
-					have := A_ss hy.1,
-					simp at this ⊢,
-					tauto,
-				},
-				have A'_fin : (A \ {x}).finite := finite.diff A_fin _,
-				have hA'F := fin_inter_sets A'_ss A'_fin,
-				exact (this hA'F) hA,
+				intros y hy,
+				exact subset_of_filter_containing _ (mem_insert_of_mem _ hy),
 			},
-			{
-				right,
-				intros A A_ss A_fin hA,
-				have hxA : xᶜ ∈ A,
-				{
-					by_contra,
-					have A_ss_F : A ⊆ F.sets,
-					{
-						intros y hy,
-						have := A_ss hy,
-						simp at *,
-						cases this, exfalso, rw this_1 at hy, exact h hy,
-						exact this_1,
-					},
-					have := fin_inter_sets A_ss_F A_fin,
-					rw hA at this,
-					apply hF.1,
-					exact this,
-				},
-				have triv : A = (A \ {xᶜ}) ∪ {xᶜ},
-				{
-					ext y,
-					simp,
-					split;finish
-				},
-				rw triv at hA, clear triv,
-				rw sInter_union at hA,
-				rw sInter_singleton at hA,
-				have A'_ss : A \ {xᶜ} ⊆ F.sets,
-				{
-					intros y hy,
-					simp at hy,
-					have := A_ss hy.1,
-					simp at this ⊢,
-					tauto,
-				},
-				have A'_fin : (A \ {xᶜ}).finite := finite.diff A_fin _,
-				have hA'F := fin_inter_sets A'_ss A'_fin,
-				exact (this hA'F) hA,
-			},
+			have := (filter_containing_proper_iff _).mpr (by assumption),
+			have := (hF.2 this) F_le,
+			apply hx.2,
+			rw this,
+			apply subset_of_filter_containing,
+			exact mem_insert _ _,
 		},
-
-		by_contra h, push_neg at h,
-		rcases h with ⟨⟨Y₁, Y₁F, Y₁_empty⟩, ⟨Y₂, Y₂F, Y₂_empty⟩⟩,
-		have contra : Y₁ ∩ Y₂ = ∅,
-		{
-			rw eq_empty_iff_forall_not_mem at *,
-			intros y hy,
-			simp at hy,
-			by_cases y ∈ x,
-			{ exact Y₁_empty _ ⟨hy.1, h⟩ },
-			{ exact Y₂_empty _ ⟨hy.2, h⟩ },
-		},
-		have inter_sets := F.inter_sets Y₁F Y₂F,
-		rw contra at inter_sets,
-		apply hF.1,
-		exact inter_sets,
-	},
+	}
 end
 
 theorem ultrafilter_of_proper_filter {F : filter α} (F_proper : proper_filter F) :
@@ -379,113 +386,20 @@ begin
 
 	intros A,
 	by_contra hA, push_neg at hA,
-	have or_fip : fip (insert A U) ∨ fip (insert Aᶜ U),
-	{
-		suffices hInter : 
-		(∀{y}, y ∈ filter_containing U → y ∩ A ≠ ∅) ∨ (∀{y}, y ∈ filter_containing U → y ∩ Aᶜ ≠ ∅),
-		{
-			unfold fip,
-			by_contra hfip, push_neg at hfip,
-			rcases hfip with ⟨⟨B₁, B₁_ss, B₁_fin, hB₁⟩, ⟨B₂, B₂_ss, B₂_fin, hB₂⟩⟩,
 
-			have hAB₁ : A ∈ B₁,
-			{
-				by_contra hAB₁,
-				have B₁_ss_U : B₁ ⊆ (filter_containing U).sets,
-				{
-					suffices : B₁ ⊆ U,
-					{
-						exact subset.trans this (subset_of_filter_containing U),
-					},
-					intros x hx,
-					specialize B₁_ss hx, simp at B₁_ss,
-					cases B₁_ss, exfalso, rw← B₁_ss at hAB₁, exact hAB₁ hx,
-					exact B₁_ss,
-				},
-				rw← fip_iff_proper_filter at U_proper,
-				exact (U_proper B₁_ss_U B₁_fin) hB₁,
-			},
-
-			have hAB₂ : Aᶜ ∈ B₂,
-			{
-				by_contra hAB₂,
-				have B₂_ss_U : B₂ ⊆ (filter_containing U).sets,
-				{
-					suffices : B₂ ⊆ U,
-					{
-						exact subset.trans this (subset_of_filter_containing U),
-					},
-					intros x hx,
-					specialize B₂_ss hx, simp at B₂_ss,
-					cases B₂_ss, exfalso, rw← B₂_ss at hAB₂, exact hAB₂ hx,
-					exact B₂_ss,
-				},
-				rw← fip_iff_proper_filter at U_proper,
-				exact (U_proper B₂_ss_U B₂_fin) hB₂,
-			},
-
-			have hB₁_cup : B₁ = (B₁ \ {A})  ∪ {A}  := by finish,
-			have hB₂_cup : B₂ = (B₂ \ {Aᶜ}) ∪ {Aᶜ} := by finish,
-			have inter₁_sets : ⋂₀ (B₁ \ {A}) ∈ filter_containing U,
-			{
-				have hss : B₁ \ {A} ⊆ (filter_containing U).sets,
-				{
-					suffices : B₁ \ {A} ⊆ U,
-					{ exact subset_trans this (subset_of_filter_containing U) },
-					intros x hx, simp at hx,
-					specialize B₁_ss hx.1, simp at B₁_ss,
-					tauto,
-				},
-				exact fin_inter_sets hss (finite.diff B₁_fin _),
-			},
-			have inter₂_sets : ⋂₀ (B₂ \ {Aᶜ}) ∈ filter_containing U,
-			{
-				have hss : B₂ \ {Aᶜ} ⊆ (filter_containing U).sets,
-				{
-					suffices : B₂ \ {Aᶜ} ⊆ U,
-					{ exact subset_trans this (subset_of_filter_containing U) },
-					intros x hx, simp at hx,
-					specialize B₂_ss hx.1, simp at B₂_ss,
-					tauto,
-				},
-				exact fin_inter_sets hss (finite.diff B₂_fin _),
-			},
-
-			cases hInter,
-			{
-				rw hB₁_cup at hB₁,
-				rw sInter_union at hB₁, simp at hB₁,
-				exact (hInter inter₁_sets) hB₁,
-			},
-			{
-				rw hB₂_cup at hB₂,
-				rw sInter_union at hB₂, simp at hB₂,
-				exact (hInter inter₂_sets) hB₂,
-			},
-		},
-		by_contra hcontra, push_neg at hcontra,
-		rcases hcontra with ⟨⟨y₁, hy₁U, hy₁A⟩, ⟨y₂, hy₂U, hy₂A⟩⟩,
-		have inter_sets : y₁ ∩ y₂ ∈ filter_containing U := (filter_containing U).inter_sets hy₁U hy₂U,
-		have inter_empty : y₁ ∩ y₂ = ∅,
-		{
-			rw eq_empty_iff_forall_not_mem at ⊢ hy₁A hy₂A,
-			intros x hx, simp at hx,
-			by_cases x ∈ A,
-			{ exact hy₁A _ ⟨hx.1, h⟩ },
-			{ exact hy₂A _ ⟨hx.2, h⟩ },
-		},
-		apply U_proper,
-		rwa inter_empty at inter_sets,
-	},
-
-	cases or_fip,
+	cases fip_insert_of_proper_filter U_proper A with or_fip or_fip,
 	{
 		have hAU : A ∉ U := λ h, hA.1 ((subset_of_filter_containing U) h),
 		have : insert A U = U,
 		{
 			apply @U_max;
 			simp,
-			assumption,
+			suffices : insert A U ⊆ insert A (filter_containing U).sets,
+			{
+				exact fip_of_subset_fip this or_fip,
+			},
+			rw insert_subset_insert_iff hAU,
+			exact subset_of_filter_containing U,
 		},
 		rw← this at hAU,
 		apply hAU,
@@ -497,7 +411,12 @@ begin
 		{
 			apply @U_max;
 			simp,
-			assumption,
+			suffices : insert Aᶜ U ⊆ insert Aᶜ (filter_containing U).sets,
+			{
+				exact fip_of_subset_fip this or_fip,
+			},
+			rw insert_subset_insert_iff hAU,
+			exact subset_of_filter_containing U,
 		},
 		rw← this at hAU,
 		apply hAU,
