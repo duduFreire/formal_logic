@@ -352,14 +352,8 @@ end
 theorem ultrafilter_of_proper_filter {F : filter α} (F_proper : proper_filter F) :
 ∃ {U : filter α} (hFU : F.sets ⊆ U.sets), ultrafilter U :=
 begin 
-	have F_fip_set : F.sets ∈ {G : set (set α) | fip G},
-	{
-		rwa [mem_set_of_eq, fip_iff_proper_filter],
-	},
-
 	have F_fip : fip F.sets := by finish[(@fip_iff_proper_filter _ F).mpr F_proper],
-
-	have := @exists_maximal_of_finite_character _ {G : set (set α) | fip G} F.sets (by assumption) _,
+	have := @exists_maximal_of_finite_character _ {G : set (set α) | fip G} F.sets F_fip _,
 	swap,
 	{
 		intros G,
@@ -375,53 +369,31 @@ begin
 		}
 	},
 
-	rcases this with ⟨U, U_fip, hFU, U_max⟩,
-	have U_proper : proper_filter (filter_containing U),
+	rcases this with ⟨U_sets, U_fip, hFU, U_max⟩,
+	have U_filter : (filter_containing U_sets).sets = U_sets,
 	{
+		apply U_max, swap, exact subset_of_filter_containing U_sets,
+		simp,
+		rw fip_iff_proper_filter,
 		rw filter_containing_proper_iff,
-		simpa,
+		exact U_fip,
 	},
-
-	use [filter_containing U, subset.trans hFU (subset_of_filter_containing U), U_proper],
-
-	intros A,
-	by_contra hA, push_neg at hA,
-
-	cases fip_insert_of_proper_filter U_proper A with or_fip or_fip,
+	use filter_containing U_sets,
+	rw U_filter,
+	use hFU,
+	rw ultrafilter_iff_maximal_proper_filter,
+	split,
 	{
-		have hAU : A ∉ U := λ h, hA.1 ((subset_of_filter_containing U) h),
-		have : insert A U = U,
-		{
-			apply @U_max;
-			simp,
-			suffices : insert A U ⊆ insert A (filter_containing U).sets,
-			{
-				exact fip_of_subset_fip this or_fip,
-			},
-			rw insert_subset_insert_iff hAU,
-			exact subset_of_filter_containing U,
-		},
-		rw← this at hAU,
-		apply hAU,
-		exact mem_insert _ _,
+		rw← fip_iff_proper_filter,
+		rw U_filter,
+		exact U_fip,
 	},
-	{
-		have hAU : Aᶜ ∉ U := λ h, hA.2 ((subset_of_filter_containing U) h),
-		have : insert Aᶜ U = U,
-		{
-			apply @U_max;
-			simp,
-			suffices : insert Aᶜ U ⊆ insert Aᶜ (filter_containing U).sets,
-			{
-				exact fip_of_subset_fip this or_fip,
-			},
-			rw insert_subset_insert_iff hAU,
-			exact subset_of_filter_containing U,
-		},
-		rw← this at hAU,
-		apply hAU,
-		exact mem_insert _ _,
-	},
+
+	intros G G_proper hG,
+	unfold has_le.le at hG, rw U_filter at hG,
+	rw← fip_iff_proper_filter at G_proper,
+	rw[←filter_eq, U_filter, eq_comm],
+	exact U_max G_proper hG,
 end
 
 theorem ultrafilter_of_fip {A : set (set α)} (A_fip : fip A) : 
