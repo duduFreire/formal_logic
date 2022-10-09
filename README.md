@@ -10,3 +10,4 @@ Goals remaining:
 * Soundness and Completeness of intuitionistic propositional logic with respect to Heyting semantics.
 * Soundness and Completeness of first order logic.
 * Löwenheim–Skolem theorem.
+* Łoś's theorem and Compactness.
