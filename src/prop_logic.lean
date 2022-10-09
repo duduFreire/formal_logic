@@ -14,7 +14,7 @@ notation ⊥ := prop_formula.bot
 notation ¬ := λp : prop_formula, p.imp ⊥
 infixr ` ->> `:5 := prop_formula.imp
 
-inductive prop_thm : set prop_formula → prop_formula → Prop 
+inductive prop_thm  : set prop_formula → prop_formula → Prop
 | ax : ∀{Γ p}, p ∈ Γ → prop_thm Γ p
 | imp_i : ∀{Γ p q}, prop_thm (Γ ∪ {p}) q → prop_thm Γ (p ->> q)
 | imp_e : ∀{Γ p q}, prop_thm Γ (p ->> q) → prop_thm Γ p → prop_thm Γ q
@@ -23,7 +23,7 @@ inductive prop_thm : set prop_formula → prop_formula → Prop
 
 infix ` ⊢ `:50 := prop_thm
 
-notation `assignment` := ℕ → Prop
+def assignment := ℕ → Prop
 
 def value (s : assignment) : prop_formula → Prop
 | ⊥ := false
@@ -509,8 +509,9 @@ infix ` ↔ ` := iff
 
 end prop_formula
 
--- Proof of or introduction without completeness for comparison with
--- lemma or_inl, which uses completeness.
+/- Proof of ∨-introduction without completeness for comparison with
+   lemma or_inl, which uses completeness.
+-/
 example {Γ φ} (ψ : prop_formula) : Γ ⊢ φ → Γ ⊢ (φ ∨ ψ) :=
 begin
 	intro h,
@@ -525,13 +526,13 @@ namespace prop_thm
 lemma or_inl {Γ φ} (ψ) : Γ ⊢ φ → Γ ⊢ (φ ∨ ψ) :=
 begin
 	rw [completeness, completeness],
-	tauto!,
+	tauto,
 end
 
 lemma or_inr {Γ ψ} (φ) : Γ ⊢ ψ → Γ ⊢ (φ ∨ ψ) :=
 begin 
 	rw [completeness, completeness],
-	tauto!,
+	tauto,
 end
 
 lemma or_e {Γ φ ψ χ}  : Γ ∪ {φ} ⊢ χ → Γ ∪ {ψ} ⊢ χ → Γ ∪ {φ ∨ ψ} ⊢ χ :=
